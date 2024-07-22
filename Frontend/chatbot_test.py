@@ -4,7 +4,6 @@ from log_callback_handler import NiceGuiLogElementCallbackHandler
 
 from nicegui import ui
 
-OPENAI_API_KEY = 'sk-proj-TS0HlQ6EWYEOcCmhLE8fT3BlbkFJ1fVwGauO60RJhvPGd5XY'  # TODO: set your OpenAI API key here
 
 
 @ui.page('/')
