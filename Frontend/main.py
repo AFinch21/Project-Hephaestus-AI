@@ -5,6 +5,8 @@ import requests
 from nicegui import ui
 import json
 from UIFunctions.UIFunctions import search_models, load_model, get_model, infer_from_model
+from langchain_openai import ChatOpenAI
+from log_callback_handler import NiceGuiLogElementCallbackHandler
 
 
 global_state = {"current_model": None} 
@@ -76,8 +78,48 @@ def main_page():
         ui.button('Load Model...', icon='rocket', on_click=lambda: load_and_set_model(model_selector.value)).classes('w-60')
 
 
-    with ui.right_drawer(fixed=False).style('background-color: #ebf1fa').props('bordered').classes('w-200') as right_drawer:
-        ui.label('RIGHT DRAWER')
+    with ui.right_drawer(fixed=False).style('background-color: #ebf1fa').props('width=600') as right_drawer:
+        
+        async def send() -> None:
+            question = text.value
+            text.value = ''
+
+            with message_container:
+                ui.chat_message(text=question, name='You', sent=True)
+                response_message = ui.chat_message(name='LLM', sent=False)
+                spinner = ui.spinner(type='dots')
+
+            response = infer_from_model(question)
+            
+            
+            # async for chunk in llm.astream(question):
+            #     response += chunk.content
+            #     response_message.clear()
+            
+
+            with response_message:
+                ui.label(response['Response'])
+            ui.run_javascript('window.scrollTo(0, document.body.scrollHeight)')
+            message_container.remove(spinner)
+
+        ui.add_css(r'a:link, a:visited {color: inherit !important; text-decoration: none; font-weight: 500}')
+
+        # the queries below are used to expand the contend down to the footer (content can then use flex-grow to expand)
+        ui.query('.q-page').classes('flex')
+        ui.query('.nicegui-content').classes('w-full')
+
+        with ui.tabs().classes('w-full') as tabs:
+            chat_tab = ui.tab('Chat')
+            logs_tab = ui.tab('Logs')
+        with ui.tab_panels(tabs, value=chat_tab).classes('w-full max-w-2xl mx-auto flex-grow items-stretch'):
+            message_container = ui.tab_panel(chat_tab).classes('items-stretch')
+            with ui.tab_panel(logs_tab):
+                log = ui.log().classes('w-full h-full')
+
+
+        with ui.row().classes('w-full no-wrap items-center'):
+            text = ui.input(placeholder="Type your prompt here...").props('rounded outlined input-class=mx-3').classes('w-full self-center').on('keydown.enter', send)
+
         
     with ui.footer().style('background-color: #3874c8'):
         ui.label('FOOTER')

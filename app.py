@@ -57,10 +57,10 @@ async def infer_from_model(prompt: ModelPrompt):
     
     global model
     
-    print(prompt)
+    print("INCOMING PROMPT:",prompt.prompt)
     
     messages = [
-        {"role": "user", "content": f"{prompt}"}
+        {"role": "user", "content": f"{prompt.prompt}"}
     ]
     
     response = model.infer(messages, stream=True)
