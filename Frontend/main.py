@@ -7,9 +7,16 @@ import json
 from UIFunctions.UIFunctions import search_models, load_model, get_model, infer_from_model
 from langchain_openai import ChatOpenAI
 from log_callback_handler import NiceGuiLogElementCallbackHandler
+import torch
+import psutil
 
 
-global_state = {"current_model": None} 
+global_state = {
+    "current_model": None,
+    "chat_log" : [],
+    "vram_usage" : 0,
+    "ram_usage" : 0
+    } 
 
 @ui.page('/main') 
 def main_page(): 
@@ -21,18 +28,72 @@ def main_page():
     ui.html('<h1 style="font-size:26px;">Model Loaded:</h1>')
     ui.label(global_state["current_model"])
     
-    prompt = ui.input(
-                label='hello...', 
-                placeholder='start typing',
-                validation={'Input too long': lambda value: len(value) < 20}).classes('w-60')
-    ui.button('infer...', icon='rocket', on_click=lambda: infer_from_model(prompt.value)).classes('w-60')
+    with ui.grid(columns='1fr 1fr').classes('w-full gap-0'):
+
+        with ui.row():
+            ui.label('1fr')
+            chart = ui.highchart({
+                'title': False,
+                'chart': {'type': 'bar'},
+                'xAxis': {'categories': ['Memory Usage']},
+
+                'series': [
+                    {'name': 'VRAM', 'data': [torch.cuda.mem_get_info()[0] / 1024 ** 3]},
+                    {'name': 'RAM', 'data': [psutil.virtual_memory().available / 1024 ** 3]},
+                ],
+            }).classes('w-full h-64')
+            
+        with ui.grid(columns='1fr 1fr').classes('w-full gap-0'):
+            with ui.row():
+                ui.label('Available RAM:')
+                ram_total = psutil.virtual_memory().total / 1024 ** 3
+                ram_ui = ui.circular_progress(
+                    min=0.0, 
+                    max=float("{:.2f}".format(ram_total)), 
+                    value=global_state['ram_usage'],
+                    size='200px'
+                    )
+            with ui.row():
+                ui.label('Available VRAM:')
+                vram_total = torch.cuda.mem_get_info()[1] / 1024 ** 3
+                vram_ui = ui.circular_progress(
+                    min=0.0, 
+                    max=float("{:.2f}".format(vram_total)), 
+                    value=global_state['vram_usage'],
+                    size='200px'
+                    )
+                
+        ui.label('test').classes('border p-1')
+
+    def get_vram_ram_usage():
+
+        # Update RAM usage
+        ram_total = psutil.virtual_memory().total / 1024 ** 3
+        ram_free = psutil.virtual_memory().available / 1024 ** 3
+
+
+        # Update VRAM usage
+        vram_free = torch.cuda.mem_get_info()[0] / 1024 ** 3
+        vram_total = torch.cuda.mem_get_info()[1] / 1024 ** 3
+        
+        global_state['vram_usage'] = vram_total - vram_free
+        global_state['ram_usage'] = ram_total - ram_free
+        
+        vram_ui.value = global_state['vram_usage']
+        ram_ui.value = global_state['ram_usage']
+        
+        print(global_state)
+        
+        return global_state['vram_usage']
 
     def load_and_set_model(selected_model): 
         load_model(selected_model)
-        print("Old model is:", global_state["current_model"]) 
-        global_state["current_model"] = get_model()['Model'] 
-        print("Current model is:", global_state["current_model"]) 
-        return global_state["current_model"] 
+    
+        global_state["current_model"] = get_model()['Model']
+        get_vram_ram_usage()
+
+        
+        return global_state["current_model"]
     
     with ui.header(elevated=True).style('background-color: #3874c8').classes('items-center justify-between'):
         ui.label('Project Hephaestus')
@@ -87,27 +148,36 @@ def main_page():
             with message_container:
                 ui.chat_message(text=question, name='You', sent=True)
                 response_message = ui.chat_message(name='LLM', sent=False)
-                spinner = ui.spinner(type='dots')
+                # Display the spinner inside the response message
+                with response_message:
+                    spinner = ui.spinner(type='dots')
 
-            response = infer_from_model(question)
-            
-            
-            # async for chunk in llm.astream(question):
-            #     response += chunk.content
-            #     response_message.clear()
-            
+            response = await call_model(question)  # Ensure this is an asynchronous call
 
+            # Remove spinner and display the response
+            response_message.clear()
+            
+            # Display the actual response
             with response_message:
                 ui.label(response['Response'])
+            
+            # Scroll down to the latest message
             ui.run_javascript('window.scrollTo(0, document.body.scrollHeight)')
-            message_container.remove(spinner)
 
+        async def call_model(question: str):
+            # Call the model and wait for the response
+            raw_response = await infer_from_model(question)
+        
+            return raw_response
+
+        # Inline CSS for anchor tags
         ui.add_css(r'a:link, a:visited {color: inherit !important; text-decoration: none; font-weight: 500}')
 
-        # the queries below are used to expand the contend down to the footer (content can then use flex-grow to expand)
+        # Expand content to footer
         ui.query('.q-page').classes('flex')
         ui.query('.nicegui-content').classes('w-full')
 
+        # Tabs for Chat and Logs
         with ui.tabs().classes('w-full') as tabs:
             chat_tab = ui.tab('Chat')
             logs_tab = ui.tab('Logs')
@@ -116,10 +186,9 @@ def main_page():
             with ui.tab_panel(logs_tab):
                 log = ui.log().classes('w-full h-full')
 
-
+        # Text input and Send button
         with ui.row().classes('w-full no-wrap items-center'):
-            text = ui.input(placeholder="Type your prompt here...").props('rounded outlined input-class=mx-3').classes('w-full self-center').on('keydown.enter', send)
-
+            text = ui.input(placeholder="Type your prompt here...").props('rounded outlined input-class=mx-3').classes('w-full self-center').on('keydown.enter', send)  
         
     with ui.footer().style('background-color: #3874c8'):
         ui.label('FOOTER')

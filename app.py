@@ -45,7 +45,7 @@ async def load_model(model_object: Model):
     global model
     
     print("Loading Model:", model_object.model_id)
-    model = ModelInference("TheBloke/Mistral-7B-Instruct-v0.1-GPTQ")
+    model = ModelInference(model_object.model_id)
     model_id = model_object.model_id
             
     return {

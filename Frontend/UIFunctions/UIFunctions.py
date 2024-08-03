@@ -1,4 +1,5 @@
 import requests
+import httpx
 import json
 
 def get_model():
@@ -69,26 +70,23 @@ def load_model(model_id):
         print('Bad response')
         return 
     
-def infer_from_model(prompt):
 
-    
-    # # API endpoint
+
+async def infer_from_model(prompt):
     url = 'http://localhost:8081/infer_from_model/'
-    
-    # Sample item data
     model_load_params = {
         'prompt': prompt,
     }
 
-    # Making the POST request
-    response = requests.post(url, json=model_load_params)
-    
-    # Checking if the request was successful
+    # Create an asynchronous client
+    async with httpx.AsyncClient() as client:
+        response = await client.post(url, json=model_load_params, timeout=60)
+
     if response.status_code == 200:
-        response = json.loads(response.text)
+        response = response.json()
         print("Model Load Response:\n", response)
         return response
     else:
         print('Bad response')
-        return 
+        return
     
