@@ -1,11 +1,28 @@
 import requests
 import httpx
 import json
+import aiohttp
 
 def get_model():
 
     # # API endpoint
     url = 'http://localhost:8081/get_model/'
+    
+    # Making the POST request
+    response = requests.get(url)
+    
+    # Checking if the request was successful
+    if response.status_code == 200:
+        response = json.loads(response.text)
+        return response
+    else:
+        print('Bad response')
+        return
+    
+def get_model_stats():
+
+    # # API endpoint
+    url = 'http://localhost:8081/get_model_stats/'
     
     # Making the POST request
     response = requests.get(url)
@@ -45,30 +62,27 @@ def search_models(author=None, sort_by='downloads', n_results=5):
         model_list = []
         return model_list
 
-def load_model(model_id):
-
-    if model_id == None:
+async def load_model(model_id):
+    if model_id is None:
         model_id = 'No Model Loaded'
     
-    # # API endpoint
+    # API endpoint
     url = 'http://localhost:8081/load_model/'
-    
-    # Sample item data
+
+    # Parameters to be sent
     model_load_params = {
         'model_id': model_id,
     }
 
-    # Making the POST request
-    response = requests.post(url, json=model_load_params)
-    
-    # Checking if the request was successful
-    if response.status_code == 200:
-        response = json.loads(response.text)
-        print("Model Load Response:\n", response)
-        return response
-    else:
-        print('Bad response')
-        return 
+    async with aiohttp.ClientSession() as session:
+        async with session.post(url, json=model_load_params) as response:
+            if response.status == 200:
+                response_data = await response.json()
+                print("Model Load Response:\n", response_data)
+                return response_data
+            else:
+                print('Bad response')
+                return None
     
 
 

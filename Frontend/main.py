@@ -4,7 +4,7 @@ from pydantic import BaseModel
 import requests
 from nicegui import ui
 import json
-from UIFunctions.UIFunctions import search_models, load_model, get_model, infer_from_model
+from UIFunctions.UIFunctions import search_models, load_model, get_model, infer_from_model, get_model_stats
 from langchain_openai import ChatOpenAI
 from log_callback_handler import NiceGuiLogElementCallbackHandler
 import torch
@@ -12,11 +12,50 @@ import psutil
 
 
 global_state = {
-    "current_model": None,
+    "current_model": "No Model Loaded",
     "chat_log" : [],
     "vram_usage" : 0,
-    "ram_usage" : 0
+    "ram_usage" : 0, 
+    "vram_total" : 0,
+    "ram_total" : 0
     } 
+
+print(global_state)
+
+initial_stats = get_model_stats()
+global_state["vram_total"] = initial_stats['vram_total']
+global_state["ram_total"] = initial_stats['ram_total']
+global_state["vram_usage"] = initial_stats['vram_used']
+global_state["ram_usage"] = initial_stats['ram_used']
+
+@ui.refreshable
+def circular_charts() -> None:
+    with ui.row():
+        ram_ui = ui.circular_progress(
+        min=0.0, 
+        max=global_state['ram_total'], 
+        value=global_state["ram_usage"],
+        size='200px'
+        )
+    with ui.row():
+        vram_ui = ui.circular_progress(
+        min=0.0, 
+        max=global_state['vram_total'], 
+        value=global_state["vram_usage"],
+        size='200px'
+        )
+
+def update_circular_charts():
+    stats = get_model_stats()
+    print(stats)
+    global_state["vram_usage"] = stats['vram_used']
+    global_state["ram_usage"] = stats['ram_used']
+    circular_charts.refresh()
+    return global_state["vram_usage"], global_state["ram_usage"]
+
+async def load_and_set_model(selected_model):
+    await load_model(selected_model)
+    update_circular_charts()
 
 @ui.page('/main') 
 def main_page(): 
@@ -26,6 +65,7 @@ def main_page():
     model_list = [] 
     
     ui.html('<h1 style="font-size:26px;">Model Loaded:</h1>')
+    
     ui.label(global_state["current_model"])
     
     with ui.grid(columns='1fr 1fr').classes('w-full gap-0'):
@@ -44,56 +84,10 @@ def main_page():
             }).classes('w-full h-64')
             
         with ui.grid(columns='1fr 1fr').classes('w-full gap-0'):
-            with ui.row():
-                ui.label('Available RAM:')
-                ram_total = psutil.virtual_memory().total / 1024 ** 3
-                ram_ui = ui.circular_progress(
-                    min=0.0, 
-                    max=float("{:.2f}".format(ram_total)), 
-                    value=global_state['ram_usage'],
-                    size='200px'
-                    )
-            with ui.row():
-                ui.label('Available VRAM:')
-                vram_total = torch.cuda.mem_get_info()[1] / 1024 ** 3
-                vram_ui = ui.circular_progress(
-                    min=0.0, 
-                    max=float("{:.2f}".format(vram_total)), 
-                    value=global_state['vram_usage'],
-                    size='200px'
-                    )
+            circular_charts()
                 
         ui.label('test').classes('border p-1')
 
-    def get_vram_ram_usage():
-
-        # Update RAM usage
-        ram_total = psutil.virtual_memory().total / 1024 ** 3
-        ram_free = psutil.virtual_memory().available / 1024 ** 3
-
-
-        # Update VRAM usage
-        vram_free = torch.cuda.mem_get_info()[0] / 1024 ** 3
-        vram_total = torch.cuda.mem_get_info()[1] / 1024 ** 3
-        
-        global_state['vram_usage'] = vram_total - vram_free
-        global_state['ram_usage'] = ram_total - ram_free
-        
-        vram_ui.value = global_state['vram_usage']
-        ram_ui.value = global_state['ram_usage']
-        
-        print(global_state)
-        
-        return global_state['vram_usage']
-
-    def load_and_set_model(selected_model): 
-        load_model(selected_model)
-    
-        global_state["current_model"] = get_model()['Model']
-        get_vram_ram_usage()
-
-        
-        return global_state["current_model"]
     
     with ui.header(elevated=True).style('background-color: #3874c8').classes('items-center justify-between'):
         ui.label('Project Hephaestus')
