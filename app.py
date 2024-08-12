@@ -50,6 +50,17 @@ async def get_model_stats():
         "ram_used" : used_ram,
         "ram_free" : free_ram
         }
+    
+@app.get("/get_model_config/")
+async def get_model_config():
+    
+    global model
+    
+    config = model.get_model_config()
+    
+    print(config)
+    
+    return config
 
 @app.post("/search_models/")
 async def search_models(model_search: ModelSearch):

@@ -1,106 +1,46 @@
-import requests
-import httpx
-import json
-import aiohttp
+from nicegui import app, ui
+from APIRequests.APIRequests import search_models, load_model, get_model, infer_from_model, get_model_stats, get_model_config
+from UIFunctions.UIFunctions import *
 
-def get_model():
 
-    # # API endpoint
-    url = 'http://localhost:8081/get_model/'
+async def load_and_set_model(selected_model):
+    await load_model(selected_model)
+    update_model_stats()
+
+@ui.refreshable
+def circular_charts(global_state) -> None:
+    with ui.row():
+        ram_ui = ui.circular_progress(
+        min=0.0, 
+        max=global_state['ram_total'], 
+        value=global_state["ram_usage"],
+        size='200px'
+        )
+    with ui.row():
+        vram_ui = ui.circular_progress(
+        min=0.0, 
+        max=global_state['vram_total'], 
+        value=global_state["vram_usage"],
+        size='200px'
+        )
+
+@ui.refreshable
+def model_name_display(global_state) -> None:
+    ui.label(global_state["current_model"])
+
+def update_model_stats(global_state):
+    stats = get_model_stats()
+    model_config = get_model_config()
     
-    # Making the POST request
-    response = requests.get(url)
+    print(stats)
     
-    # Checking if the request was successful
-    if response.status_code == 200:
-        response = json.loads(response.text)
-        return response
-    else:
-        print('Bad response')
-        return
+    # First lets update the cicular charts
+    global_state["vram_usage"] = stats['vram_used']
+    global_state["ram_usage"] = stats['ram_used']
+    circular_charts.refresh()
     
-def get_model_stats():
-
-    # # API endpoint
-    url = 'http://localhost:8081/get_model_stats/'
+    # Now the model title
+    global_state["current_model"] = stats['Model']
+    model_name_display.refresh()
     
-    # Making the POST request
-    response = requests.get(url)
-    
-    # Checking if the request was successful
-    if response.status_code == 200:
-        response = json.loads(response.text)
-        return response
-    else:
-        print('Bad response')
-        return 
-
-def search_models(author=None, sort_by='downloads', n_results=5):
-    global model_list
-
-    # # API endpoint
-    url = 'http://localhost:8081/search_models/'
-    
-    # Sample item data
-    model_search_params = {
-        'author': author,
-        'task': 'text-generation',
-        'sort_by': sort_by.lower(),
-        'n_results': n_results,
-    }
-
-    # Making the POST request
-    response = requests.post(url, json=model_search_params)
-    
-    # Checking if the request was successful
-    if response.status_code == 200:
-        response = json.loads(response.text)
-        model_list = [model for model in response['Results']]
-        return model_list
-    else:
-        print('Bad response')
-        model_list = []
-        return model_list
-
-async def load_model(model_id):
-    if model_id is None:
-        model_id = 'No Model Loaded'
-    
-    # API endpoint
-    url = 'http://localhost:8081/load_model/'
-
-    # Parameters to be sent
-    model_load_params = {
-        'model_id': model_id,
-    }
-
-    async with aiohttp.ClientSession() as session:
-        async with session.post(url, json=model_load_params) as response:
-            if response.status == 200:
-                response_data = await response.json()
-                print("Model Load Response:\n", response_data)
-                return response_data
-            else:
-                print('Bad response')
-                return None
-    
-
-
-async def infer_from_model(prompt):
-    url = 'http://localhost:8081/infer_from_model/'
-    model_load_params = {
-        'prompt': prompt,
-    }
-
-    # Create an asynchronous client
-    async with httpx.AsyncClient() as client:
-        response = await client.post(url, json=model_load_params, timeout=60)
-
-    if response.status_code == 200:
-        response = response.json()
-        print("Model Load Response:\n", response)
-        return response
-    else:
-        print('Bad response')
-        return
-    
+    return global_state["vram_usage"], global_state["ram_usage"], global_state["current_model"], model_config

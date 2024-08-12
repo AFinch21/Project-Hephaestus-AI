@@ -68,3 +68,32 @@ class ModelInference:
             )
         
         return self.tokenizer.decode(output[0])
+    
+    def get_model_config(self):
+        
+            config = self.model.config
+            
+            config_dict = {
+            "bos_token_id": str(config.bos_token_id),
+            "eos_token_id" : str(config.eos_token_id),
+            "pad_token_id" : str(config.pad_token_id),
+            "hidden_act" : str(config.hidden_act),
+            "hidden_size" : str(config.hidden_size),
+            "intermediate_size" : str(config.intermediate_size),
+            "max_position_embeddings" : str(config.max_position_embeddings),
+            "model_type" : str(config.model_type),
+            "num_attention_heads" : str(config.num_attention_heads),
+            "num_hidden_layers" : str(config.num_hidden_layers),
+            "num_key_value_heads" : str(config.num_key_value_heads),
+            "vocab_size" : str(config.vocab_size),
+            }
+            
+            if self.model.config.quantization_config:
+                config_dict['quantization_config'] = {
+                    "bits" : str(config.quantization_config.bits),
+                    "quant_method" : str(config.quantization_config.quant_method),
+                    "group_size" : str(config.quantization_config.group_size),
+                }
+
+            
+            return config_dict

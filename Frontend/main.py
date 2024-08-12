@@ -1,12 +1,8 @@
-from fastapi import FastAPI
 from nicegui import app, ui
 from pydantic import BaseModel
-import requests
-from nicegui import ui
-import json
-from UIFunctions.UIFunctions import search_models, load_model, get_model, infer_from_model, get_model_stats
-from langchain_openai import ChatOpenAI
-from log_callback_handler import NiceGuiLogElementCallbackHandler
+from APIRequests.APIRequests import search_models, load_model, get_model, infer_from_model, get_model_stats
+from UIFunctions.UIFunctions import *
+from ModelFunctions.ModelFunctions import *
 import torch
 import psutil
 
@@ -28,65 +24,41 @@ global_state["ram_total"] = initial_stats['ram_total']
 global_state["vram_usage"] = initial_stats['vram_used']
 global_state["ram_usage"] = initial_stats['ram_used']
 
-@ui.refreshable
-def circular_charts() -> None:
-    with ui.row():
-        ram_ui = ui.circular_progress(
-        min=0.0, 
-        max=global_state['ram_total'], 
-        value=global_state["ram_usage"],
-        size='200px'
-        )
-    with ui.row():
-        vram_ui = ui.circular_progress(
-        min=0.0, 
-        max=global_state['vram_total'], 
-        value=global_state["vram_usage"],
-        size='200px'
-        )
-
-def update_circular_charts():
-    stats = get_model_stats()
-    print(stats)
-    global_state["vram_usage"] = stats['vram_used']
-    global_state["ram_usage"] = stats['ram_used']
-    circular_charts.refresh()
-    return global_state["vram_usage"], global_state["ram_usage"]
-
-async def load_and_set_model(selected_model):
-    await load_model(selected_model)
-    update_circular_charts()
 
 @ui.page('/main') 
 def main_page(): 
      
-    global_state["current_model"] = get_model()['Model'] 
-    print(global_state["current_model"]) 
     model_list = [] 
     
     ui.html('<h1 style="font-size:26px;">Model Loaded:</h1>')
     
-    ui.label(global_state["current_model"])
+    model_name_display(global_state)
     
     with ui.grid(columns='1fr 1fr').classes('w-full gap-0'):
 
         with ui.row():
-            ui.label('1fr')
-            chart = ui.highchart({
-                'title': False,
-                'chart': {'type': 'bar'},
-                'xAxis': {'categories': ['Memory Usage']},
+            with ui.grid(columns=2):
+                ui.label('Model Type:')
+                ui.label('Tom')
 
-                'series': [
-                    {'name': 'VRAM', 'data': [torch.cuda.mem_get_info()[0] / 1024 ** 3]},
-                    {'name': 'RAM', 'data': [psutil.virtual_memory().available / 1024 ** 3]},
-                ],
-            }).classes('w-full h-64')
+                ui.label('Vocab Size:')
+                ui.label('42')
+
+                ui.label('Hidden Size:')
+                ui.label('1.80m')
+            with ui.grid(columns=2):
+                ui.label('Attention Heads:')
+                ui.label('Tom')
+
+                ui.label('Key Value Heads:')
+                ui.label('42')
+
+                ui.label('Intermediate Size:')
+                ui.label('1.80m')
             
         with ui.grid(columns='1fr 1fr').classes('w-full gap-0'):
-            circular_charts()
+            circular_charts(global_state)
                 
-        ui.label('test').classes('border p-1')
 
     
     with ui.header(elevated=True).style('background-color: #3874c8').classes('items-center justify-between'):
@@ -130,7 +102,7 @@ def main_page():
         model_selector = ui.select(model_list).classes('w-60')
         
         # Button creation
-        ui.button('Load Model...', icon='rocket', on_click=lambda: load_and_set_model(model_selector.value)).classes('w-60')
+        ui.button('Load Model...', icon='rocket', on_click=lambda: load_and_set_model(model_selector.value, global_state)).classes('w-60')
 
 
     with ui.right_drawer(fixed=False).style('background-color: #ebf1fa').props('width=600') as right_drawer:
